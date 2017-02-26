@@ -2,14 +2,19 @@ package metrics
 
 import (
 	"bytes"
+	"net/url"
 	"sort"
 	"strings"
+)
+
+const (
+	tagEncodingDelimiter = "|"
 )
 
 func EncodeNameWithTags(name string, tags map[string]string) string {
 
 	var b bytes.Buffer
-	b.WriteString(name)
+	b.WriteString(url.QueryEscape(name))
 
 	if len(tags) > 0 {
 
@@ -21,10 +26,10 @@ func EncodeNameWithTags(name string, tags map[string]string) string {
 		sort.Strings(keys)
 
 		for _, v := range keys {
-			b.WriteString("|")
-			b.WriteString(v)
-			b.WriteString("|")
-			b.WriteString(tags[v])
+			b.WriteString(tagEncodingDelimiter)
+			b.WriteString(url.QueryEscape(v))
+			b.WriteString(tagEncodingDelimiter)
+			b.WriteString(url.QueryEscape(tags[v]))
 		}
 	}
 
@@ -36,16 +41,34 @@ func DecodeNameWithTags(full string) (string, map[string]string) {
 	name := full
 	var tags map[string]string = nil
 
-	splits := strings.Split(full, "|")
+	splits := strings.Split(full, tagEncodingDelimiter)
 	splitsLen := len(splits)
 
 	if splitsLen > 1 {
 		name = splits[0]
 		tags = make(map[string]string)
 		for i := 1; i < splitsLen; i += 2 {
-			tags[splits[i]] = splits[i+1]
+
+			k := splits[i]
+			unescapedK, err := url.QueryUnescape(k)
+			if err != nil {
+				unescapedK = k
+			}
+
+			v := splits[i+1]
+			unescapedV, err := url.QueryUnescape(v)
+			if err != nil {
+				unescapedK = v
+			}
+
+			tags[unescapedK] = unescapedV
 		}
 	}
 
-	return name, tags
+	unescaped, err := url.QueryUnescape(name)
+	if err != nil {
+		unescaped = name
+	}
+
+	return unescaped, tags
 }
